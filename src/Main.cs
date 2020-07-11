@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using CitizenFX.Core;
 using CitizenFX.Core.UI;
 using static CitizenFX.Core.Native.API;
+using SharpConfig;
 
 namespace SmartCuff
 {
@@ -19,27 +20,27 @@ namespace SmartCuff
 
         public int playerLoop = 64;
 
+        public int cuffedBy = 0;
+
+        public bool permissionsEnabled = false;
+
+        public bool useId = false;
+
         public Main()
         {
+            ReadConfig();
+
             RequestAnim("anim@move_m@prisoner_cuffed");
             RequestAnim("mp_arresting");
 
             RequestModel(GetHashKey("p_cs_cuffs_02_s"));
-
-            RegisterKeyMapping("frontcuff", "Front Handcuff", "keyboard", ",");
-            RegisterKeyMapping("cuff", "Rear Handcuff", "keyboard", ".");
             
-            TriggerEvent("chat:addSuggestion", "/frontcuff", "Frontcuff the nearest player");
-            TriggerEvent("chat:addSuggestion", "/cuff", "Rear cuff the nearest player");
             TriggerEvent("chat:addSuggestion", "/resetcuff", "Gives you a pair of handcuffs again");
-            TriggerEvent("chat:addSuggestion", "/passcuffs", "Pass cuffs to another player", new[]
-            {
-                new { name="Player ID", help="Target player ID" },
-            });
+
+
             if (GetConvar("onesync_enabled", "true") == "true")
             {
                 playerLoop = 256;
-                Debug.WriteLine("Onesync Detected");
             }
 
             EventHandlers["Client:CuffSound"] += new Action<int, float, string, float>((networkId, soundRadius, soundFile, soundVolume) =>
@@ -61,16 +62,18 @@ namespace SmartCuff
                 var local = GetEntityCoords(PlayerPedId(), true);
                 if (local.DistanceToSquared(location) < 5.5f && GetPlayerServerId(PlayerId()) == request)
                 {
-                    TriggerServerEvent("Server:CuffSound", Game.Player.Character.NetworkId, 20.0f, "cuff", 0.6f);
                     if (cuffed)
                     {
-                        TriggerServerEvent("Server:ReturnResult", client, 1);
+                        TriggerServerEvent("Server:CuffSound", Game.Player.Character.NetworkId, 20.0f, "cuff", 0.6f);
+                        TriggerServerEvent("Server:ReturnResult", cuffedBy, 1);
                         cuffed = false;
                     }
                     else
                     {
                         if (type != 3)
                         {
+                            TriggerServerEvent("Server:CuffSound", Game.Player.Character.NetworkId, 20.0f, "cuff", 0.6f);
+                            cuffedBy = client;
                             TriggerServerEvent("Server:ReturnResult", client, 0);
                             cuffed = true;
                             cuffType = type;
@@ -107,33 +110,6 @@ namespace SmartCuff
                     }
                 }
             });
-
-            RegisterCommand("passcuffs", new Action<int, List<object>, string>((source, args, raw) =>
-            {
-                if (IsStringNullOrEmpty(Convert.ToString(args[0])))
-                {
-                    TriggerEvent("chat:addMessage", new
-                    {
-                        color = new[] { 255, 192, 41 },
-                        args = new[] { "[SmartCuffs]", $"Usage /passcuffs [playerID]." }
-                    });
-                }
-                else
-                {
-                    int result = 0;
-                    var targetId = Int32.TryParse(Convert.ToString(args[0]), out result);
-                    if (result == GetPlayerServerId(PlayerId()))
-                    {
-                        Screen.ShowNotification("You cannot pass ~r~handcuffs ~w~to yourself.");
-                    }
-                    else
-                    {
-                        Screen.ShowNotification("You have passed a pair of ~r~handcuffs.");
-                        TriggerServerEvent("Server:ReturnResult", result, 2);
-                        pairs--;
-                    }
-                }
-            }), false);
         }
 
         private void ProcessCuffs(int type)
@@ -243,18 +219,6 @@ namespace SmartCuff
             }
         }
 
-        [Command("frontcuff")]
-        private void Frontcuff()
-        {
-            ProcessSubmission(1);
-        }
-        //DONT LET PEOPLE CUFF PEOPLE IF THEY ARE CUFFED
-        [Command("cuff")]
-        private void Rearcuff()
-        {
-            ProcessSubmission(0);
-        }
-
         [Command("resetcuff")]
         private void ResetCuffs()
         {
@@ -285,6 +249,25 @@ namespace SmartCuff
             }  
         }
 
+        private void ProcessSubmissionId(int type, int id)
+        {
+            if (IsEligible())
+            {
+                var server = id;
+                if (!(server == -1))
+                {
+                    if (pairs > 0)
+                    {
+                        TriggerServerEvent("Server:CuffLocal", server, GetPlayerServerId(PlayerId()), GetEntityCoords(PlayerPedId(), true), type, 1);
+                    }
+                    else
+                    {
+                        TriggerServerEvent("Server:CuffLocal", server, GetPlayerServerId(PlayerId()), GetEntityCoords(PlayerPedId(), true), 3, 1);
+                    }
+                }
+            }
+        }
+
         private int Raycast()
         {
             var location = GetEntityCoords(PlayerPedId(), true);
@@ -310,6 +293,92 @@ namespace SmartCuff
             return -1;
         }
 
+        private void ReadConfig()
+        {
+            var data = LoadResourceFile(GetCurrentResourceName(), "config.ini");
+            if (Configuration.LoadFromString(data).Contains("SmartCuffs", "PermissionsEnabled") == true)
+            {
+                Configuration loaded = Configuration.LoadFromString(data);
+
+                permissionsEnabled = loaded["SmartCuffs"]["PermissionsEnabled"].BoolValue;
+
+                useId = loaded["SmartCuffs"]["UsePlayerIds"].BoolValue;
+
+                CreateCommand(permissionsEnabled);
+            }
+        }
+
+        private void CreateCommand(bool permissions)
+        {
+            RegisterCommand("frontcuff", new Action<string, List<object>, string>((source, args, raw) =>
+            {
+                if (useId)
+                {
+                    int argsInt = 0;
+                    Int32.TryParse(Convert.ToString(args[0]), out argsInt);
+
+                    if (GetPlayerServerId(PlayerId()) == argsInt)
+                    {
+                        Screen.ShowNotification("You are not able to cuff yourself.");
+                    }
+                    else
+                    {
+                        ProcessSubmissionId(1, argsInt);
+                    }
+                }
+                else
+                {
+                    ProcessSubmission(1);
+                }
+            }), permissions);
+
+
+
+            RegisterCommand("cuff", new Action<string, List<object>, string>((source, args, raw) =>
+            {
+                if (useId)
+                {
+                    int argsInt = 0;
+                    Int32.TryParse(Convert.ToString(args[0]), out argsInt);
+
+                    if (GetPlayerServerId(PlayerId()) == argsInt)
+                    {
+                        Screen.ShowNotification("You are not able to cuff yourself.");
+                    }
+                    else
+                    {
+                        ProcessSubmissionId(0, argsInt);
+                    }
+                }
+                else
+                {
+                    ProcessSubmission(0);
+                }
+            }), permissions);
+
+            if (!useId)
+            {
+                TriggerEvent("chat:addSuggestion", "/frontcuff", "Frontcuff the nearest player");
+                TriggerEvent("chat:addSuggestion", "/cuff", "Rear cuff the nearest player");
+
+                RegisterKeyMapping("frontcuff", "Front Handcuff", "keyboard", ",");
+                RegisterKeyMapping("cuff", "Rear Handcuff", "keyboard", ".");
+
+            }
+            else
+            {
+                TriggerEvent("chat:addSuggestion", "/frontcuff", "Frontcuff another player", new[]
+                {
+                    new { name="PlayerID", help="Target Player ID" },
+                });
+
+                TriggerEvent("chat:addSuggestion", "/cuff", "Rearcuff another player", new[]
+                {
+                    new { name="PlayerID", help="Target Player ID" },
+                });
+            }
+        }
+
         private async void RequestAnim(string dictionary)
         {
             RequestAnimDict(dictionary);
@@ -319,6 +388,5 @@ namespace SmartCuff
             }
             await Delay(0);
         }
-
     }
 }
