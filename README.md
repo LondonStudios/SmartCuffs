@@ -17,7 +17,6 @@ Join our Discord for exclusive plugin previews [here](https://discord.gg/AtPt9ND
 **/cuff** - Rearcuff the nearest player.
 **/frontcuff** - Frontcuff the nearest player.
 **/resetcuff** - Gives you a pair of handcuffs again.
-**/passcuffs [Player ID]** - Pass a pair of handcuffs to another player.
 
 Both **/cuff** and **/frontcuff** have been mapped to Keybinds, these can be configured by each player, allowing for their own custom keybinds. These can be set in **Settings > Keybinds > FiveM.**
 These **must** be setup by each player upon their first time using the plugin.
