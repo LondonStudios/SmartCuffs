@@ -1,3 +1,19 @@
+![London Studios](https://i.ibb.co/1mwSS1q/Untitled-design.png)
+
+# London Studios - Update
+Since forming London Studios in April 2020 we've created a number of **high quality** and **premium** resources for the FiveM project, focusing on the emergency services and aiming to bring your server to the next level.
+
+Although we made a number of free resources such as this one in the first year, we've now switched to creating paid content, keeping them constantly updated and working along with providing the best possible support to our customers.
+
+Our **most popular** resources now include *Smart Fires, Police Grappler* and *Smart Hose*.
+
+With **thousands** of **happy customers** we are confident you'll love our resources and our active support team are on hand to help if you have any questions!
+
+# Our store: https://store.londonstudios.net/github
+# Our discord: https://discord.gg/nC2krpN
+
+Therefore, this resource is now likely *out of date* and is *no longer supported by us*. The full source code is available should you wish to make any changes. All of our paid resources however are constantly updated and we invite you to take a look!
+
 # SmartCuffs - London Studios
 **SmartCuffs** is a **FiveM** resource coded in **C#** to enhance the player handcuff experience. You have the ability to both frontcuff and rearcuff other players, along with an included British Speedcuff Model and custom sounds.
 
